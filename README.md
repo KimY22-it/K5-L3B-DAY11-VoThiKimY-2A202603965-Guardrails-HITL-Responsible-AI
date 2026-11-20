@@ -1,3 +1,46 @@
+
+## Thông tin học viên
+
+- Họ và tên: Võ Thị Kim Ý
+- MSSV: 2A202603965
+- Bài lab: Day 11 — Guardrails, HITL & Responsible AI
+
+## Kết quả thực hiện
+
+- Checkpoint 2–3: Xây dựng và kiểm thử Blue Guardrails.
+- Checkpoint 4: Thực hiện 5 prompt tấn công.
+- Red: 5/5 prompt làm lộ secret giả.
+- Red Advance: 0/5 prompt làm lộ secret.
+- Checkpoint 5: Báo cáo được sinh tự động bằng grade.py.
+
+## Hướng dẫn chạy
+
+Cài đặt dependencies:
+
+python -m pip install -r requirements.txt
+
+Chạy bài lab:
+
+python src/main.py --part 4
+
+Chạy kiểm thử:
+
+python -m pytest tests/smoke -q
+python -m pytest tests/public -q
+
+Sinh báo cáo:
+
+python scripts/grade.py --submission-dir . --out outputs/grade_report.json
+
+## Kết quả đầu ra
+
+- outputs/results.json
+- outputs/attack_results.json
+- outputs/grade_report.json
+- outputs/lab_report.md
+
+
+
 # Day 11 — Controlled Agent Security (2026)
 
 > 👤 **Hình thức:** bài tập **cá nhân** (1 người / 1 MSSV).  
