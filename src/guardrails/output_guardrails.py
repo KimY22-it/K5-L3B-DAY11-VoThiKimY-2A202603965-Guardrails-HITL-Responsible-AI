@@ -14,6 +14,7 @@ from google.adk.plugins import base_plugin
 
 from core.utils import chat_with_agent
 
+from google.adk.models.lite_llm import LiteLlm
 
 # ============================================================
 # Implement content_filter()
@@ -41,12 +42,11 @@ def content_filter(response: str) -> dict:
 
     # PII patterns to check
     PII_PATTERNS = {
-        # TODO: Add regex patterns for:
-        # - VN phone number: r"0\d{9,10}"
-        # - Email: r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}"
-        # - National ID (CMND/CCCD): r"\b\d{9}\b|\b\d{12}\b"
-        # - API key pattern: r"sk-[a-zA-Z0-9-]+"
-        # - Password pattern: r"password\s*[:=]\s*\S+"
+        "Password": r"password\s*[:=]\s*\S+",
+        "Email": r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}",
+        "VN phone number": r"(?<!\d)0\d{9,10}(?!\d)",
+        "National ID (CMND/CCCD)": r"\b(?:\d{9}|\d{12})\b",
+        "API key": r"sk-[a-zA-Z0-9-]+",
     }
 
     for name, pattern in PII_PATTERNS.items():
@@ -97,14 +97,18 @@ If UNSAFE, add a brief reason on the next line.
 #     instruction=SAFETY_JUDGE_INSTRUCTION,
 # )
 
-safety_judge_agent = None  # TODO: Replace with implementation
+safety_judge_agent = llm_agent.LlmAgent(
+    model=LiteLlm(model="openai/gpt-4o-mini"),
+    name="safety_judge",
+    instruction=SAFETY_JUDGE_INSTRUCTION,
+)
 judge_runner = None
 
 
 def _init_judge():
     """Initialize the judge agent and runner (call after creating the agent)."""
     global judge_runner
-    if safety_judge_agent is not None:
+    if safety_judge_agent is not None and judge_runner is None:
         judge_runner = runners.InMemoryRunner(
             agent=safety_judge_agent, app_name="safety_judge"
         )
@@ -119,13 +123,15 @@ async def llm_safety_check(response_text: str) -> dict:
     Returns:
         dict with 'safe' (bool) and 'verdict' (str)
     """
-    if safety_judge_agent is None or judge_runner is None:
+    if safety_judge_agent is None:
         return {"safe": True, "verdict": "Judge not initialized — skipping"}
 
+    _init_judge()
     prompt = f"Evaluate this AI response for safety:\n\n{response_text}"
     verdict, _ = await chat_with_agent(safety_judge_agent, judge_runner, prompt)
-    is_safe = "SAFE" in verdict.upper() and "UNSAFE" not in verdict.upper()
-    return {"safe": is_safe, "verdict": verdict.strip()}
+    verdict = verdict.strip()
+    first_line = verdict.partition("\n")[0].strip()
+    return {"safe": first_line.upper() == "SAFE", "verdict": verdict}
 
 
 # ============================================================
@@ -154,7 +160,7 @@ class OutputGuardrailPlugin(base_plugin.BasePlugin):
         """Extract text from LLM response."""
         text = ""
         if hasattr(llm_response, "content") and llm_response.content:
-            for part in llm_response.content.parts:
+            for part in llm_response.content.parts or ():
                 if hasattr(part, "text") and part.text:
                     text += part.text
         return text
@@ -181,7 +187,26 @@ class OutputGuardrailPlugin(base_plugin.BasePlugin):
         #    - Increment self.blocked_count
         # 3. Return llm_response (possibly modified)
 
-        return llm_response  # TODO: modify if needed
+        filter_result = content_filter(response_text)
+        if not filter_result["safe"]:
+            llm_response.content = types.Content(
+                role=llm_response.content.role,
+                parts=[types.Part.from_text(text=filter_result["redacted"])],
+            )
+            self.redacted_count += 1
+
+        if self.use_llm_judge:
+            judge_result = await llm_safety_check(filter_result["redacted"])
+            if not judge_result["safe"]:
+                llm_response.content = types.Content(
+                    role=llm_response.content.role,
+                    parts=[types.Part.from_text(
+                        text="Xin lỗi, tôi không thể gửi phản hồi này."
+                    )],
+                )
+                self.blocked_count += 1
+
+        return llm_response
 
 
 # ============================================================
