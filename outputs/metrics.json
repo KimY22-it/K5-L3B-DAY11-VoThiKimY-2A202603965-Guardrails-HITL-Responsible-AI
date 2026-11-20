@@ -1,0 +1,29 @@
+{
+  "total_requests": 26,
+  "blocked_requests": 10,
+  "block_rate": 0.38461538461538464,
+  "rate_limit_hits": 1,
+  "judge_checks": 0,
+  "judge_fails": 0,
+  "judge_fail_rate": 0.0,
+  "alerts": [
+    {
+      "metric": "block_rate",
+      "value": 0.5454545454545454,
+      "threshold": 0.5,
+      "message": "block_rate (0.5455) exceeded its threshold (0.5)."
+    },
+    {
+      "metric": "block_rate",
+      "value": 0.5833333333333334,
+      "threshold": 0.5,
+      "message": "block_rate (0.5833) exceeded its threshold (0.5)."
+    },
+    {
+      "metric": "block_rate",
+      "value": 0.5384615384615384,
+      "threshold": 0.5,
+      "message": "block_rate (0.5385) exceeded its threshold (0.5)."
+    }
+  ]
+}

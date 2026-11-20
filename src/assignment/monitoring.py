@@ -43,17 +43,36 @@ class MonitoringAlert:
 
     def check_metrics(self) -> list[Alert]:
         """TODO: compute rates, append Alert objects when thresholds exceeded."""
-        raise NotImplementedError("Implement MonitoringAlert.check_metrics")
+        metrics = self._metrics()
+        triggered = []
+        for metric, threshold in (
+            ("block_rate", self.block_rate_threshold),
+            ("rate_limit_hits", self.rate_limit_hit_threshold),
+            ("judge_fail_rate", self.judge_fail_rate_threshold),
+        ):
+            value = metrics[metric]
+            if value > threshold:
+                triggered.append(Alert(
+                    metric=metric,
+                    value=value,
+                    threshold=threshold,
+                    message=f"{metric} ({value:.4g}) exceeded its threshold ({threshold:.4g}).",
+                ))
+
+        self.alerts.extend(triggered)
+        return triggered
 
     def export_json(self, filepath: str | None = None):
         """TODO: write metrics + alerts to JSON under repo-root ``outputs/`` by default.
         Use ``filepath or default_metrics_path()`` so running from ``src/`` does not
         create ``src/outputs/``.
         """
-        _ = filepath or default_metrics_path()
-        raise NotImplementedError("Implement MonitoringAlert.export_json")
+        path = Path(filepath or default_metrics_path())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as stream:
+            json.dump(self.snapshot(), stream, indent=2)
 
-    def snapshot(self) -> dict:
+    def _metrics(self) -> dict[str, int | float]:
         block_rate = (
             self.blocked_requests / self.total_requests
             if self.total_requests
@@ -70,6 +89,11 @@ class MonitoringAlert:
             "judge_checks": self.judge_checks,
             "judge_fails": self.judge_fails,
             "judge_fail_rate": judge_fail_rate,
+        }
+
+    def snapshot(self) -> dict:
+        return {
+            **self._metrics(),
             "alerts": [
                 {
                     "metric": a.metric,
